@@ -54,6 +54,42 @@ const emails = {
     html: `<div style="${S}">${logo}<h2>Новая регистрация</h2>
     <p><b>Имя:</b> ${name}<br><b>Email:</b> ${email}<br><b>Время:</b> ${new Date().toLocaleString('ru')}</p>
     <a href="${BASE_URL}/admin" style="${B}">Панель администратора →</a>${foot}</div>` }),
+
+  transferAlert: (to, ownerName, botName, clientName, clientContact, convId) => send(
+    to,
+    `🙋 Клиент хочет поговорить с менеджером — ${botName}`,
+    wrap(`
+      <h2 style="color:#1a1a2e;margin-bottom:12px">Запрос на связь с менеджером</h2>
+      <p style="color:#444;margin-bottom:20px">Клиент бота <strong>${botName}</strong> просит соединить с живым менеджером.</p>
+      <div style="background:#f0effe;border-radius:12px;padding:20px;margin-bottom:20px">
+        <div style="font-weight:600;margin-bottom:8px">Данные клиента:</div>
+        <div style="color:#666">Имя: <strong>${clientName || 'не указано'}</strong></div>
+        <div style="color:#666;margin-top:4px">Контакт: <strong>${clientContact || 'не указан'}</strong></div>
+      </div>
+      <a href="${BASE_URL}/bots/${convId ? `?conv=${convId}` : ''}" style="display:inline-block;background:#7c6cf5;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
+        Посмотреть диалог →
+      </a>
+      <p style="color:#888;font-size:13px;margin-top:20px">Ответьте клиенту как можно быстрее!</p>
+    `)
+  ),
 };
 
-module.exports = { send, emails, ADMIN_EMAIL };
+module.exports = { send, emails, ADMIN_EMAIL 
+  transferAlert: (to, ownerName, botName, clientName, clientContact, convId) => send(
+    to,
+    `🙋 Клиент хочет поговорить с менеджером — ${botName}`,
+    wrap(`
+      <h2 style="color:#1a1a2e;margin-bottom:12px">Запрос на связь с менеджером</h2>
+      <p style="color:#444;margin-bottom:20px">Клиент бота <strong>${botName}</strong> просит соединить с живым менеджером.</p>
+      <div style="background:#f0effe;border-radius:12px;padding:20px;margin-bottom:20px">
+        <div style="font-weight:600;margin-bottom:8px">Данные клиента:</div>
+        <div style="color:#666">Имя: <strong>${clientName || 'не указано'}</strong></div>
+        <div style="color:#666;margin-top:4px">Контакт: <strong>${clientContact || 'не указан'}</strong></div>
+      </div>
+      <a href="${BASE_URL}/bots/${convId ? `?conv=${convId}` : ''}" style="display:inline-block;background:#7c6cf5;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
+        Посмотреть диалог →
+      </a>
+      <p style="color:#888;font-size:13px;margin-top:20px">Ответьте клиенту как можно быстрее!</p>
+    `)
+  ),
+};

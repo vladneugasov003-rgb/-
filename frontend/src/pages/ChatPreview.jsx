@@ -11,6 +11,9 @@ export default function ChatPreview() {
   const [sending, setSending] = useState(false)
   const [convId, setConvId] = useState(null)
   const [error, setError] = useState('')
+  const [showTransfer, setShowTransfer] = useState(false)
+  const [transferred, setTransferred] = useState(false)
+  const [transferForm, setTransferForm] = useState({ name:'', contact:'' })
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -23,6 +26,21 @@ export default function ChatPreview() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior:'smooth' })
   }, [messages])
+
+
+  const transfer = async () => {
+    try {
+      const token = localStorage.getItem('bm_token')
+      await fetch(`/api/bots/${id}/transfer`, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', Authorization:`Bearer ${token}` },
+        body: JSON.stringify({ conversation_id: convId, ...transferForm })
+      })
+      setTransferred(true)
+      setShowTransfer(false)
+      setMessages(m => [...m, { role:'assistant', content:'✅ Запрос передан! Менеджер свяжется с вами в ближайшее время.', id: Date.now() }])
+    } catch(e) { setError('Не удалось передать запрос') }
+  }
 
   const send = async () => {
     const text = input.trim()
@@ -138,6 +156,33 @@ export default function ChatPreview() {
         </div>
       )}
 
+
+      {/* Transfer to manager */}
+      {!transferred && convId && (
+        <div style={{ padding:'0 24px 8px' }}>
+          {!showTransfer ? (
+            <button className="btn btn-sm" style={{ fontSize:12, color:'var(--c-muted)' }}
+              onClick={() => setShowTransfer(true)}>
+              🙋 Соединить с менеджером
+            </button>
+          ) : (
+            <div style={{ background:'var(--c-surface)', border:'1px solid var(--c-border)', borderRadius:10, padding:14 }}>
+              <div style={{ fontSize:13, fontWeight:500, marginBottom:10 }}>Оставьте контакт — менеджер свяжется с вами</div>
+              <input type="text" placeholder="Ваше имя" value={transferForm.name}
+                onChange={e => setTransferForm(f => ({...f, name:e.target.value}))}
+                style={{ marginBottom:8 }} />
+              <input type="text" placeholder="Телефон или email"
+                value={transferForm.contact}
+                onChange={e => setTransferForm(f => ({...f, contact:e.target.value}))}
+                style={{ marginBottom:10 }} />
+              <div style={{ display:'flex', gap:8 }}>
+                <button className="btn btn-primary btn-sm" onClick={transfer}>Отправить</button>
+                <button className="btn btn-sm" onClick={() => setShowTransfer(false)}>Отмена</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       {/* Input */}
       <div style={{
         display:'flex', gap:10, padding:'12px 24px', borderTop:'1px solid var(--c-border)',

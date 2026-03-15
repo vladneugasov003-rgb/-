@@ -66,6 +66,13 @@
     #bm-powered { text-align: center; padding: 4px; font-size: 10px; color: #bbb; background: #fff; }
     #bm-powered a { color: #bbb; text-decoration: none; }
     #bm-powered a:hover { color: ${COLOR}; }
+    #bm-transfer { padding: 0 12px 8px; }
+    .bm-transfer-btn { font-size: 11px; color: #888; background: none; border: none; cursor: pointer; padding: 4px 0; text-decoration: underline; }
+    .bm-transfer-form { background: #f8f8fc; border-radius: 10px; padding: 12px; margin-top: 6px; }
+    .bm-transfer-form input { width: 100%; margin-bottom: 6px; padding: 7px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 12px; }
+    .bm-transfer-form-btns { display: flex; gap: 6px; }
+    .bm-transfer-submit { flex: 1; padding: 7px; background: ${COLOR}; color: #fff; border: none; border-radius: 8px; font-size: 12px; cursor: pointer; }
+    .bm-transfer-cancel { padding: 7px 12px; background: #eee; border: none; border-radius: 8px; font-size: 12px; cursor: pointer; }
     @media (max-width: 400px) { #bm-chat { right: 8px; left: 8px; width: auto; } #bm-btn { bottom: 16px; right: 16px; } }
   `;
   document.head.appendChild(style);
@@ -88,6 +95,7 @@
       </div>
       <div id="bm-msgs"></div>
       <div id="bm-suggestions"></div>
+    <div id="bm-transfer"></div>
       <div id="bm-input-row">
         <input id="bm-input" placeholder="Напишите вопрос..." />
         <button id="bm-send">
@@ -157,6 +165,46 @@
     if (t) t.remove();
   }
 
+
+  let transferShown = false;
+
+  function showTransferBtn() {
+    const el = document.getElementById('bm-transfer');
+    if (!convId || transferShown) return;
+    el.innerHTML = '<button class="bm-transfer-btn" onclick="showTransferForm()">🙋 Соединить с менеджером</button>';
+  }
+
+  window.showTransferForm = function() {
+    const el = document.getElementById('bm-transfer');
+    el.innerHTML = `<div class="bm-transfer-form">
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px">Оставьте контакт:</div>
+      <input id="bm-t-name" type="text" placeholder="Ваше имя" />
+      <input id="bm-t-contact" type="text" placeholder="Телефон или email" />
+      <div class="bm-transfer-form-btns">
+        <button class="bm-transfer-submit" onclick="submitTransfer()">Отправить</button>
+        <button class="bm-transfer-cancel" onclick="cancelTransfer()">Отмена</button>
+      </div>
+    </div>`;
+  };
+
+  window.submitTransfer = async function() {
+    const name = document.getElementById('bm-t-name')?.value;
+    const contact = document.getElementById('bm-t-contact')?.value;
+    try {
+      await fetch(`${API}/api/widget/${BOT_ID}/transfer`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: convId, client_name: name, client_contact: contact })
+      });
+      document.getElementById('bm-transfer').innerHTML = '';
+      transferShown = true;
+      addMsg('bot', '✅ Запрос передан менеджеру. Ожидайте — с вами свяжутся!');
+    } catch(e) {}
+  };
+
+  window.cancelTransfer = function() {
+    document.getElementById('bm-transfer').innerHTML = '<button class="bm-transfer-btn" onclick="showTransferForm()">🙋 Соединить с менеджером</button>';
+  };
+
   async function sendMsg() {
     const text = input.value.trim();
     if (!text) return;
@@ -176,6 +224,7 @@
       if (data.reply) {
         convId = data.conversation_id;
         addMsg('bot', data.reply);
+        setTimeout(showTransferBtn, 2000);
       }
     } catch(e) {
       removeTyping();

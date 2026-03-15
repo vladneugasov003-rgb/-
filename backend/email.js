@@ -1,0 +1,59 @@
+const nodemailer = require('nodemailer');
+
+const SMTP_USER = process.env.SMTP_USER || '';
+const SMTP_PASS = process.env.SMTP_PASS || '';
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465');
+const FROM_NAME = 'БотМастер';
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || SMTP_USER;
+
+let transporter = null;
+function getT() {
+  if (!SMTP_USER || !SMTP_PASS) return null;
+  if (!transporter) transporter = nodemailer.createTransport({
+    host: SMTP_HOST, port: SMTP_PORT, secure: SMTP_PORT === 465,
+    auth: { user: SMTP_USER, pass: SMTP_PASS }
+  });
+  return transporter;
+}
+
+async function send(to, subject, html) {
+  const t = getT();
+  if (!t) { console.log(`[Email skip] ${subject} -> ${to}`); return false; }
+  try {
+    await t.sendMail({ from: `"${FROM_NAME}" <${SMTP_USER}>`, to, subject, html });
+    console.log(`✉️  ${subject} -> ${to}`);
+    return true;
+  } catch(e) { console.error('Email error:', e.message); return false; }
+}
+
+const S = 'font-family:-apple-system,Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;color:#1a1a2e';
+const B = 'display:inline-block;padding:12px 28px;background:#7c6cf5;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;margin-top:20px';
+const logo = '<div style="font-size:24px;font-weight:700;color:#7c6cf5;margin-bottom:24px">Б БотМастер</div>';
+const foot = '<hr style="margin:32px 0;border:none;border-top:1px solid #eee"><p style="font-size:12px;color:#888">БотМастер · Орёл · ФСИ 2026</p>';
+
+const emails = {
+  welcome: (name, days=14) => ({ subject: `Добро пожаловать в БотМастер, ${name}! 🎉`,
+    html: `<div style="${S}">${logo}<h2>Привет, ${name}! 👋</h2>
+    <p>У вас активирован <b>пробный период на ${days} дней</b> с возможностями тарифа «Бизнес».</p>
+    <ul style="margin:12px 0;padding-left:20px;line-height:2"><li>До 10 ботов</li><li>Telegram + сайт</li><li>2000 диалогов/мес</li><li>Аналитика</li></ul>
+    <a href="${BASE_URL}/dashboard" style="${B}">Открыть платформу →</a>${foot}</div>` }),
+
+  trialEnding: (name, days) => ({ subject: `⚠️ Пробный период заканчивается через ${days} дня`,
+    html: `<div style="${S}">${logo}<h2>Осталось ${days} дня, ${name}</h2>
+    <p>После окончания аккаунт перейдёт на бесплатный тариф (1 бот, 30 диалогов/мес).</p>
+    <a href="${BASE_URL}/pricing" style="${B}">Выбрать тариф →</a>${foot}</div>` }),
+
+  paymentSuccess: (name, plan, amount) => ({ subject: `✅ Оплата подтверждена — тариф «${plan}»`,
+    html: `<div style="${S}">${logo}<h2>Спасибо за оплату! 🎉</h2>
+    <p>Платёж <b>${amount}₽</b> прошёл. Тариф <b>«${plan}»</b> активирован.</p>
+    <a href="${BASE_URL}/dashboard" style="${B}">Личный кабинет →</a>${foot}</div>` }),
+
+  newUser: (name, email) => ({ subject: `🆕 Новый пользователь: ${name}`,
+    html: `<div style="${S}">${logo}<h2>Новая регистрация</h2>
+    <p><b>Имя:</b> ${name}<br><b>Email:</b> ${email}<br><b>Время:</b> ${new Date().toLocaleString('ru')}</p>
+    <a href="${BASE_URL}/admin" style="${B}">Панель администратора →</a>${foot}</div>` }),
+};
+
+module.exports = { send, emails, ADMIN_EMAIL };

@@ -40,6 +40,7 @@ export default function Sidebar() {
         <NavItem to="/dashboard" end icon="⊞" label="Дашборд" />
 
         <div style={{ fontSize:10, color:'var(--c-hint)', padding:'14px 22px 4px', textTransform:'uppercase', letterSpacing:'0.08em' }}>Боты</div>
+        <NavItem to="/onboarding" icon="🧙" label="Мастер создания" />
         <NavItem to="/bots/new" icon="＋" label="Создать бота" />
 
         <div style={{ fontSize:10, color:'var(--c-hint)', padding:'14px 22px 4px', textTransform:'uppercase', letterSpacing:'0.08em' }}>Аккаунт</div>

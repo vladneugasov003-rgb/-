@@ -124,3 +124,28 @@ const queries = {
 };
 
 module.exports = { init, queries };
+
+// Admin queries (append to exports)
+const adminQueries = {
+  getAllUsers: () => all(`SELECT id,email,name,plan,trial_ends_at,created_at FROM users ORDER BY created_at DESC`),
+  getAllPayments: () => all(`SELECT p.*,u.email,u.name FROM payments p LEFT JOIN users u ON p.user_id=u.id ORDER BY p.created_at DESC LIMIT 100`),
+  getAdminStats: () => ({
+    total_users: get(`SELECT COUNT(*) as c FROM users`)?.c || 0,
+    paying_users: get(`SELECT COUNT(*) as c FROM users WHERE plan NOT IN ('free','trial')`)?.c || 0,
+    total_revenue: get(`SELECT SUM(amount) as s FROM payments WHERE status='succeeded'`)?.s || 0,
+    total_bots: get(`SELECT COUNT(*) as c FROM bots`)?.c || 0,
+    total_conversations: get(`SELECT COUNT(*) as c FROM conversations`)?.c || 0,
+    today_registrations: get(`SELECT COUNT(*) as c FROM users WHERE created_at >= date('now')`)?.c || 0,
+  }),
+};
+
+Object.assign(queries, adminQueries);
+
+// Add extra queries needed for admin panel
+const extraQueries = {
+  getAllUsers: () => all(`SELECT * FROM users ORDER BY created_at DESC`),
+  getAllBots: () => all(`SELECT * FROM bots ORDER BY created_at DESC`),
+  getTotalConversations: () => (get(`SELECT COUNT(*) as count FROM conversations`)||{}).count||0,
+  getTotalMessages: () => (get(`SELECT COUNT(*) as count FROM messages`)||{}).count||0,
+};
+Object.assign(queries, extraQueries);

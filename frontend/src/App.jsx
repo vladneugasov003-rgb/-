@@ -9,6 +9,8 @@ import Constructor from './pages/Constructor.jsx'
 import ChatPreview from './pages/ChatPreview.jsx'
 import Analytics from './pages/Analytics.jsx'
 import Pricing from './pages/Pricing.jsx'
+import Admin from './pages/Admin.jsx'
+import Onboarding from './pages/Onboarding.jsx'
 
 export const AuthCtx = createContext(null)
 export const useAuth = () => useContext(AuthCtx)
@@ -22,6 +24,7 @@ function AppLayout() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/pricing" element={<Pricing />} />
+          <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/bots/new" element={<Constructor />} />
           <Route path="/bots/:id/edit" element={<Constructor />} />
           <Route path="/bots/:id/chat" element={<ChatPreview />} />
@@ -45,21 +48,10 @@ export default function App() {
     })
   }, [])
 
-  const login = (token, userData) => {
-    localStorage.setItem('bm_token', token)
-    setUser(userData)
-  }
+  const login = (token, userData) => { localStorage.setItem('bm_token', token); setUser(userData) }
+  const logout = () => { localStorage.removeItem('bm_token'); setUser(null) }
 
-  const logout = () => {
-    localStorage.removeItem('bm_token')
-    setUser(null)
-  }
-
-  if (loading) return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh' }}>
-      <div className="spinner" />
-    </div>
-  )
+  if (loading) return <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh' }}><div className="spinner" /></div>
 
   return (
     <AuthCtx.Provider value={{ user, login, logout, setUser }}>
@@ -67,6 +59,7 @@ export default function App() {
         <Route path="/" element={!user ? <Landing /> : <Navigate to="/dashboard" />} />
         <Route path="/login" element={!user ? <AuthPage mode="login" /> : <Navigate to="/dashboard" />} />
         <Route path="/register" element={!user ? <AuthPage mode="register" /> : <Navigate to="/dashboard" />} />
+        <Route path="/admin" element={<Admin />} />
         <Route path="/*" element={user ? <AppLayout /> : <Navigate to="/" />} />
       </Routes>
     </AuthCtx.Provider>

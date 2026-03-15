@@ -45,6 +45,7 @@ export default function Sidebar() {
 
         <div style={{ fontSize:10, color:'var(--c-hint)', padding:'14px 22px 4px', textTransform:'uppercase', letterSpacing:'0.08em' }}>Аккаунт</div>
         <NavItem to="/pricing" icon="💎" label="Тарифы" />
+        <NavItem to="/profile" icon="👤" label="Профиль" />
       </nav>
 
       {/* Trial warning */}

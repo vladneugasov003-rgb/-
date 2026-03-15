@@ -91,6 +91,8 @@ const queries = {
   createUser: (id,e,p,n) => run(`INSERT INTO users (id,email,password,name) VALUES (?,?,?,?)`,[id,e,p,n]),
   getUserByEmail: (e) => get(`SELECT * FROM users WHERE email=?`,[e]),
   getUserById: (id) => get(`SELECT * FROM users WHERE id=?`,[id]),
+  updateProfile: (name, email, id) => run(`UPDATE users SET name=?,email=? WHERE id=?`,[name,email,id]),
+  updatePassword: (hash, id) => run(`UPDATE users SET password=? WHERE id=?`,[hash,id]),
   updateUserPlan: (plan, id) => run(`UPDATE users SET plan=? WHERE id=?`,[plan,id]),
 
   createBot: (id,uid,name,niche,desc,greeting) => run(`INSERT INTO bots (id,user_id,name,niche,description,greeting) VALUES (?,?,?,?,?,?)`,[id,uid,name,niche,desc,greeting]),

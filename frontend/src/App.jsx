@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard.jsx'
 import Constructor from './pages/Constructor.jsx'
 import ChatPreview from './pages/ChatPreview.jsx'
 import Analytics from './pages/Analytics.jsx'
+import Conversations from './pages/Conversations.jsx'
 import Pricing from './pages/Pricing.jsx'
 import Admin from './pages/Admin.jsx'
 import Onboarding from './pages/Onboarding.jsx'
@@ -29,6 +30,7 @@ function AppLayout() {
           <Route path="/bots/:id/edit" element={<Constructor />} />
           <Route path="/bots/:id/chat" element={<ChatPreview />} />
           <Route path="/bots/:id/analytics" element={<Analytics />} />
+          <Route path="/bots/:id/conversations" element={<Conversations />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>

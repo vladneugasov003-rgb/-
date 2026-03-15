@@ -129,6 +129,7 @@ export default function Dashboard() {
                 </span>
                 <div style={{ display:'flex', gap:6 }}>
                   <button className="btn btn-sm" onClick={() => navigate(`/bots/${bot.id}/chat`)}>💬</button>
+                  <button className="btn btn-sm" onClick={() => navigate(`/bots/${bot.id}/conversations`)}>📋</button>
                   <button className="btn btn-sm" onClick={() => navigate(`/bots/${bot.id}/analytics`)}>📊</button>
                   <button className="btn btn-sm" onClick={() => navigate(`/bots/${bot.id}/edit`)}>✏️</button>
                   <button className="btn btn-sm btn-danger" onClick={() => handleDelete(bot)} disabled={deleting===bot.id}>

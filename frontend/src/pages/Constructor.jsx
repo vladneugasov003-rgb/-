@@ -103,7 +103,7 @@ export default function Constructor() {
       </div>
 
       <div className="tabs">
-        {[['info','⚙️ Основное'],['knowledge','📚 База знаний'],['channels','📡 Каналы'],['widget','🎨 Виджет']].map(([k,l]) => (
+        {[['info','⚙️ Основное'],['knowledge','📚 База знаний'],['channels','📡 Каналы'],['widget','🎨 Виджет'],['crm','🔗 CRM']].map(([k,l]) => (
           <div key={k} className={`tab ${tab===k?'active':''}`} onClick={() => setTab(k)}>{l}</div>
         ))}
       </div>
@@ -263,6 +263,60 @@ export default function Constructor() {
           <div style={{ background:'var(--c-surface2)', borderRadius:8, padding:12, fontFamily:'var(--mono)', fontSize:12, color:'var(--c-muted)', lineHeight:1.6 }}>
             {`<script src="https://botmaster.ru/widget.js"\n  data-bot="${id || 'bot-id-после-создания'}"\n  data-color="${form.widget_color}">\n</script>`}
           </div>
+        </div>
+      )}
+
+      {tab === 'crm' && (
+        <div className="card">
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20 }}>
+            <div style={{ width:40, height:40, borderRadius:10, background:'#e8f0fe', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>🔗</div>
+            <div>
+              <div style={{ fontWeight:600, fontSize:14 }}>AmoCRM интеграция</div>
+              <div style={{ fontSize:12, color:'var(--c-muted)' }}>Заявки из бота автоматически попадают в CRM</div>
+            </div>
+          </div>
+
+          <div style={{ background:'var(--c-surface2)', borderRadius:10, padding:14, marginBottom:20, fontSize:13, lineHeight:1.7 }}>
+            <div style={{ fontWeight:500, marginBottom:6 }}>Как это работает:</div>
+            <div style={{ color:'var(--c-muted)' }}>
+              1. Клиент пишет боту слова «записаться», «заявка», «цена» и другие<br/>
+              2. Бот автоматически создаёт контакт и сделку в вашей AmoCRM<br/>
+              3. Также сделка создаётся при нажатии «Соединить с менеджером»
+            </div>
+          </div>
+
+          <div className="field-label">Домен AmoCRM</div>
+          <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+            <input type="text" value={form.amocrm_domain}
+              onChange={e => setForm(f=>({...f, amocrm_domain:e.target.value.replace('.amocrm.ru','')}))}
+              placeholder="ваш-домен" style={{ flex:1 }} />
+            <span style={{ color:'var(--c-muted)', fontSize:13, whiteSpace:'nowrap' }}>.amocrm.ru</span>
+          </div>
+          <p style={{ fontSize:11, color:'var(--c-hint)', marginTop:4 }}>
+            Например: если адрес mycompany.amocrm.ru — введите mycompany
+          </p>
+
+          <div className="field-label">Токен доступа (API ключ)</div>
+          <input type="text" value={form.amocrm_token}
+            onChange={e => setForm(f=>({...f, amocrm_token:e.target.value}))}
+            placeholder="eyJ0eXAiOiJKV1QiLCJhbGc..." />
+          <p style={{ fontSize:11, color:'var(--c-hint)', marginTop:4 }}>
+            AmoCRM → Настройки → Интеграции → API → Ключи и токены доступа
+          </p>
+
+          <div className="field-label">Воронка для новых сделок (ID)</div>
+          <input type="text" value={form.amocrm_pipeline_id}
+            onChange={e => setForm(f=>({...f, amocrm_pipeline_id:e.target.value}))}
+            placeholder="12345 (оставьте пустым для воронки по умолчанию)" />
+          <p style={{ fontSize:11, color:'var(--c-hint)', marginTop:4 }}>
+            AmoCRM → Сделки → ID воронки в адресе страницы
+          </p>
+
+          {form.amocrm_domain && form.amocrm_token && (
+            <div style={{ marginTop:16, padding:'12px 14px', background:'var(--c-green-dim)', borderRadius:8, fontSize:13, color:'var(--c-green)' }}>
+              ✅ AmoCRM настроен — заявки будут создаваться автоматически
+            </div>
+          )}
         </div>
       )}
     </div>

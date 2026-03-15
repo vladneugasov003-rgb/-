@@ -39,6 +39,7 @@ async function init() {
       knowledge TEXT DEFAULT '', channels TEXT DEFAULT '["site"]',
       widget_color TEXT DEFAULT '#7c6cf5', is_active INTEGER DEFAULT 1,
       telegram_token TEXT DEFAULT '', telegram_webhook_set INTEGER DEFAULT 0,
+      vk_token TEXT DEFAULT '', vk_group_id TEXT DEFAULT '', vk_confirm_code TEXT DEFAULT '',
       created_at DATETIME DEFAULT (datetime('now')),
       updated_at DATETIME DEFAULT (datetime('now'))
     );
@@ -99,9 +100,9 @@ const queries = {
   getBotsByUser: (uid) => all(`SELECT * FROM bots WHERE user_id=? ORDER BY created_at DESC`,[uid]),
   getBotById: (id) => get(`SELECT * FROM bots WHERE id=?`,[id]),
   getBotByToken: (token) => get(`SELECT * FROM bots WHERE telegram_token=?`,[token]),
-  updateBot: (name,niche,desc,greeting,knowledge,channels,color,active,token,id,uid) =>
-    run(`UPDATE bots SET name=?,niche=?,description=?,greeting=?,knowledge=?,channels=?,widget_color=?,is_active=?,telegram_token=?,updated_at=datetime('now') WHERE id=? AND user_id=?`,
-      [name,niche,desc,greeting,knowledge,channels,color,active,token,id,uid]),
+  updateBot: (name,niche,desc,greeting,knowledge,channels,color,active,token,vk_token,vk_group_id,vk_confirm_code,id,uid) =>
+    run(`UPDATE bots SET name=?,niche=?,description=?,greeting=?,knowledge=?,channels=?,widget_color=?,is_active=?,telegram_token=?,vk_token=?,vk_group_id=?,vk_confirm_code=?,updated_at=datetime('now') WHERE id=? AND user_id=?`,
+      [name,niche,desc,greeting,knowledge,channels,color,active,token,vk_token,vk_group_id,vk_confirm_code,id,uid]),
   deleteBot: (id,uid) => run(`DELETE FROM bots WHERE id=? AND user_id=?`,[id,uid]),
   setTelegramWebhook: (id, val) => run(`UPDATE bots SET telegram_webhook_set=? WHERE id=?`,[val,id]),
 

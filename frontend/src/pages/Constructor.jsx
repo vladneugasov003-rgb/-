@@ -169,6 +169,46 @@ export default function Constructor() {
             ))}
           </div>
 
+
+          {form.channels.includes('vk') && (
+            <div style={{ marginTop:20, background:'var(--c-surface2)', borderRadius:10, padding:16 }}>
+              <div style={{ fontWeight:500, fontSize:13, marginBottom:12, color:'var(--c-text)' }}>⚙️ Настройка ВКонтакте</div>
+              
+              <div className="field-label">Шаг 1 — Токен сообщества</div>
+              <input type="text" value={form.vk_token} onChange={e => setForm(f=>({...f, vk_token:e.target.value}))}
+                placeholder="vk1.a.xxxxx..." />
+              <p style={{ fontSize:11, color:'var(--c-hint)', marginTop:4 }}>
+                ВКонтакте → Управление сообществом → Работа с API → Ключи доступа → Создать ключ
+              </p>
+
+              <div className="field-label">Шаг 2 — ID сообщества</div>
+              <input type="text" value={form.vk_group_id} onChange={e => setForm(f=>({...f, vk_group_id:e.target.value}))}
+                placeholder="123456789" />
+              <p style={{ fontSize:11, color:'var(--c-hint)', marginTop:4 }}>
+                Найдите в адресе страницы сообщества или в настройках
+              </p>
+
+              <div className="field-label">Шаг 3 — Код подтверждения</div>
+              <input type="text" value={form.vk_confirm_code} onChange={e => setForm(f=>({...f, vk_confirm_code:e.target.value}))}
+                placeholder="a1b2c3d4" />
+              <p style={{ fontSize:11, color:'var(--c-hint)', marginTop:4 }}>
+                ВКонтакте → Управление сообществом → Работа с API → Callback API → Строка для подтверждения
+              </p>
+
+              {id && (
+                <div style={{ marginTop:12, padding:'10px 12px', background:'var(--c-purple-dim)', borderRadius:8 }}>
+                  <div style={{ fontSize:12, fontWeight:500, marginBottom:4 }}>Шаг 4 — Адрес для Callback API:</div>
+                  <div style={{ fontFamily:'var(--mono)', fontSize:11, color:'var(--c-purple)', wordBreak:'break-all' }}>
+                    {window.location.origin.replace('5173','3000')}/api/vk/webhook/{id}
+                  </div>
+                  <p style={{ fontSize:11, color:'var(--c-muted)', marginTop:6 }}>
+                    Вставьте этот адрес в ВКонтакте → Работа с API → Callback API → Адрес сервера
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {form.channels.includes('telegram') && (
             <>
               <div className="field-label">Telegram Bot Token (от @BotFather)</div>

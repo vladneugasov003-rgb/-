@@ -218,7 +218,8 @@ app.put('/api/bots/:id', auth, async (req, res) => {
   if (!bot || bot.user_id !== req.user.id) return res.status(404).json({ error:'Не найден' });
   const { name=bot.name, niche=bot.niche, description=bot.description, greeting=bot.greeting,
     knowledge=bot.knowledge, channels=JSON.parse(bot.channels||'[]'),
-    widget_color=bot.widget_color, is_active=bot.is_active, telegram_token=bot.telegram_token||'' } = req.body;
+    widget_color=bot.widget_color, is_active=bot.is_active, telegram_token=bot.telegram_token||'',
+    vk_token=bot.vk_token||'', vk_group_id=bot.vk_group_id||'', vk_confirm_code=bot.vk_confirm_code||'' } = req.body;
 
   if (telegram_token && telegram_token !== bot.telegram_token) {
     try {
@@ -230,7 +231,7 @@ app.put('/api/bots/:id', auth, async (req, res) => {
     } catch(e) { console.error('TG webhook:', e.message); }
   }
 
-  queries.updateBot(name,niche,description,greeting,knowledge,JSON.stringify(channels),widget_color,is_active?1:0,telegram_token,req.params.id,req.user.id);
+  queries.updateBot(name,niche,description,greeting,knowledge,JSON.stringify(channels),widget_color,is_active?1:0,telegram_token,vk_token,vk_group_id,vk_confirm_code,req.params.id,req.user.id);
   const updated = queries.getBotById(req.params.id);
   res.json({ ...updated, channels:JSON.parse(updated.channels||'[]') });
 });

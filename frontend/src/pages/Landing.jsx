@@ -138,6 +138,22 @@ export default function Landing() {
         <span>© 2026 БотМастер — Программа «Студенческий стартап» · ФСИ</span>
         <span>Орёл, Россия</span>
       </footer>
+
+      <style>{`
+        @media (max-width: 640px) {
+          .landing-nav { padding: 12px 16px !important; }
+          .landing-hero { padding: 48px 16px 32px !important; }
+          .landing-hero h1 { font-size: 32px !important; }
+          .landing-btns { flex-direction: column !important; }
+          .landing-btns button { width: 100% !important; }
+          .landing-section { padding: 40px 16px !important; }
+          .landing-plans { grid-template-columns: 1fr !important; }
+          .landing-features { grid-template-columns: 1fr !important; }
+          .landing-stats { grid-template-columns: repeat(2,1fr) !important; }
+          .landing-footer { flex-direction: column !important; text-align: center !important; }
+          .login-btn { display: none !important; }
+        }
+      `}</style>
     </div>
   )
 }

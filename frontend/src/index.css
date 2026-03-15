@@ -137,3 +137,51 @@ textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
 .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; }
 .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+
+/* ── Mobile responsive ──────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+}
+
+/* ── Mobile app layout ───────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Push content right when hamburger shown */
+  main { padding-left: 0 !important; }
+  
+  /* Dashboard */
+  .page-header { flex-wrap: wrap; gap: 12px; }
+  .page-header .btn { font-size: 12px; padding: 6px 12px; }
+  
+  /* Metrics grid */
+  .grid-4 { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+  
+  /* Bot row actions — icon only on mobile */
+  .bot-actions-label { display: none; }
+  
+  /* Constructor tabs scroll */
+  .tabs { overflow-x: auto; white-space: nowrap; }
+  .tab { flex-shrink: 0; }
+  
+  /* Full width inputs */
+  input[type=text], input[type=email], input[type=password], textarea, select {
+    font-size: 16px; /* prevents iOS zoom */
+  }
+
+  /* Chat full screen on mobile */
+  .chat-area { height: calc(100vh - 0px); }
+
+  /* Card padding reduce */
+  .card { padding: 14px; }
+
+  /* Page padding reduce */
+  [style*="padding: 32px"] { padding: 16px !important; }
+}
+
+@media (max-width: 480px) {
+  .grid-4 { grid-template-columns: 1fr !important; }
+  .metric-value { font-size: 20px !important; }
+}
+
+@media (max-width: 768px) {
+  .app-main { padding-top: 56px !important; }
+}

@@ -21,7 +21,7 @@ function AppLayout() {
   return (
     <div style={{ display:'flex', height:'100vh', overflow:'hidden' }}>
       <Sidebar />
-      <main style={{ flex:1, overflow:'auto', background:'var(--c-bg)' }}>
+      <main style={{ flex:1, overflow:'auto', background:'var(--c-bg)', paddingTop:0 }} className="app-main">
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/dashboard" element={<Dashboard />} />

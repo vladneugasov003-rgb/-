@@ -33,30 +33,49 @@ const B = 'display:inline-block;padding:12px 28px;background:#7c6cf5;color:#fff;
 const logo = '<div style="font-size:24px;font-weight:700;color:#7c6cf5;margin-bottom:24px">Б БотМастер</div>';
 const foot = '<hr style="margin:32px 0;border:none;border-top:1px solid #eee"><p style="font-size:12px;color:#888">БотМастер · Орёл · ФСИ 2026</p>';
 
+function wrap(inner) {
+  return `<div style="${S}">${logo}${inner}${foot}</div>`;
+}
+
 const emails = {
-  welcome: (name, days=14) => ({ subject: `Добро пожаловать в БотМастер, ${name}! 🎉`,
-    html: `<div style="${S}">${logo}<h2>Привет, ${name}! 👋</h2>
-    <p>У вас активирован <b>пробный период на ${days} дней</b> с возможностями тарифа «Бизнес».</p>
-    <ul style="margin:12px 0;padding-left:20px;line-height:2"><li>До 10 ботов</li><li>Telegram + сайт</li><li>2000 диалогов/мес</li><li>Аналитика</li></ul>
-    <a href="${BASE_URL}/dashboard" style="${B}">Открыть платформу →</a>${foot}</div>` }),
+  welcome: (to, name, days = 14) => send(to,
+    `Добро пожаловать в БотМастер, ${name}! 🎉`,
+    wrap(`
+      <h2>Привет, ${name}! 👋</h2>
+      <p>У вас активирован <b>пробный период на ${days} дней</b> с возможностями тарифа «Бизнес».</p>
+      <ul style="margin:12px 0;padding-left:20px;line-height:2"><li>До 10 ботов</li><li>Telegram + сайт</li><li>2000 диалогов/мес</li><li>Аналитика</li></ul>
+      <a href="${BASE_URL}/dashboard" style="${B}">Открыть платформу →</a>
+    `)
+  ),
 
-  trialEnding: (name, days) => ({ subject: `⚠️ Пробный период заканчивается через ${days} дня`,
-    html: `<div style="${S}">${logo}<h2>Осталось ${days} дня, ${name}</h2>
-    <p>После окончания аккаунт перейдёт на бесплатный тариф (1 бот, 30 диалогов/мес).</p>
-    <a href="${BASE_URL}/pricing" style="${B}">Выбрать тариф →</a>${foot}</div>` }),
+  trialEnding: (to, name, days) => send(to,
+    `⚠️ Пробный период заканчивается через ${days} дня`,
+    wrap(`
+      <h2>Осталось ${days} дня, ${name}</h2>
+      <p>После окончания аккаунт перейдёт на бесплатный тариф (1 бот, 30 диалогов/мес).</p>
+      <a href="${BASE_URL}/pricing" style="${B}">Выбрать тариф →</a>
+    `)
+  ),
 
-  paymentSuccess: (name, plan, amount) => ({ subject: `✅ Оплата подтверждена — тариф «${plan}»`,
-    html: `<div style="${S}">${logo}<h2>Спасибо за оплату! 🎉</h2>
-    <p>Платёж <b>${amount}₽</b> прошёл. Тариф <b>«${plan}»</b> активирован.</p>
-    <a href="${BASE_URL}/dashboard" style="${B}">Личный кабинет →</a>${foot}</div>` }),
+  paymentSuccess: (to, name, plan, amount) => send(to,
+    `✅ Оплата подтверждена — тариф «${plan}»`,
+    wrap(`
+      <h2>Спасибо за оплату! 🎉</h2>
+      <p>Платёж <b>${amount}₽</b> прошёл. Тариф <b>«${plan}»</b> активирован.</p>
+      <a href="${BASE_URL}/dashboard" style="${B}">Личный кабинет →</a>
+    `)
+  ),
 
-  newUser: (name, email) => ({ subject: `🆕 Новый пользователь: ${name}`,
-    html: `<div style="${S}">${logo}<h2>Новая регистрация</h2>
-    <p><b>Имя:</b> ${name}<br><b>Email:</b> ${email}<br><b>Время:</b> ${new Date().toLocaleString('ru')}</p>
-    <a href="${BASE_URL}/admin" style="${B}">Панель администратора →</a>${foot}</div>` }),
+  adminNewUser: (to, name, email) => send(to,
+    `🆕 Новый пользователь: ${name}`,
+    wrap(`
+      <h2>Новая регистрация</h2>
+      <p><b>Имя:</b> ${name}<br><b>Email:</b> ${email}<br><b>Время:</b> ${new Date().toLocaleString('ru')}</p>
+      <a href="${BASE_URL}/admin" style="${B}">Панель администратора →</a>
+    `)
+  ),
 
-  transferAlert: (to, ownerName, botName, clientName, clientContact, convId) => send(
-    to,
+  transferAlert: (to, ownerName, botName, clientName, clientContact, convId) => send(to,
     `🙋 Клиент хочет поговорить с менеджером — ${botName}`,
     wrap(`
       <h2 style="color:#1a1a2e;margin-bottom:12px">Запрос на связь с менеджером</h2>
@@ -74,22 +93,4 @@ const emails = {
   ),
 };
 
-module.exports = { send, emails, ADMIN_EMAIL 
-  transferAlert: (to, ownerName, botName, clientName, clientContact, convId) => send(
-    to,
-    `🙋 Клиент хочет поговорить с менеджером — ${botName}`,
-    wrap(`
-      <h2 style="color:#1a1a2e;margin-bottom:12px">Запрос на связь с менеджером</h2>
-      <p style="color:#444;margin-bottom:20px">Клиент бота <strong>${botName}</strong> просит соединить с живым менеджером.</p>
-      <div style="background:#f0effe;border-radius:12px;padding:20px;margin-bottom:20px">
-        <div style="font-weight:600;margin-bottom:8px">Данные клиента:</div>
-        <div style="color:#666">Имя: <strong>${clientName || 'не указано'}</strong></div>
-        <div style="color:#666;margin-top:4px">Контакт: <strong>${clientContact || 'не указан'}</strong></div>
-      </div>
-      <a href="${BASE_URL}/bots/${convId ? `?conv=${convId}` : ''}" style="display:inline-block;background:#7c6cf5;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
-        Посмотреть диалог →
-      </a>
-      <p style="color:#888;font-size:13px;margin-top:20px">Ответьте клиенту как можно быстрее!</p>
-    `)
-  ),
-};
+module.exports = emails;

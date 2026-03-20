@@ -287,7 +287,7 @@ async function askOpenRouter(bot, history, retries = 1) {
           'X-Title': 'BotMaster AI'
         },
         body: JSON.stringify({
-          model: 'deepseek/deepseek-chat-v3-0324:free',
+          model: 'openrouter/free',
           max_tokens: 400,
           messages
         })

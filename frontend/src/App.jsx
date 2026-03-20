@@ -13,6 +13,7 @@ import Pricing from './pages/Pricing.jsx'
 import Admin from './pages/Admin.jsx'
 import Profile from './pages/Profile.jsx'
 import Onboarding from './pages/Onboarding.jsx'
+import Docs from './pages/Docs.jsx'
 
 export const AuthCtx = createContext(null)
 export const useAuth = () => useContext(AuthCtx)
@@ -33,6 +34,7 @@ function AppLayout() {
           <Route path="/bots/:id/analytics" element={<Analytics />} />
           <Route path="/bots/:id/conversations" element={<Conversations />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/docs" element={<Docs />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>

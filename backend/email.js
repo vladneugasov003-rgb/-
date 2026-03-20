@@ -75,6 +75,16 @@ const emails = {
     `)
   ),
 
+  verifyCode: (to, name, code) => send(to,
+    `🔐 Код подтверждения — ${code}`,
+    wrap(`
+      <h2>Подтвердите email, ${name}</h2>
+      <p>Ваш код подтверждения:</p>
+      <div style="font-size:36px;font-weight:700;letter-spacing:8px;text-align:center;padding:20px;background:#f0effe;border-radius:12px;color:#7c6cf5;margin:20px 0">${code}</div>
+      <p style="color:#888;font-size:13px">Код действителен 15 минут. Если вы не регистрировались — просто проигнорируйте это письмо.</p>
+    `)
+  ),
+
   transferAlert: (to, ownerName, botName, clientName, clientContact, convId) => send(to,
     `🙋 Клиент хочет поговорить с менеджером — ${botName}`,
     wrap(`

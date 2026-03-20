@@ -372,6 +372,9 @@ function friendlyAIError(e) {
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 
+// Generate 6-digit code
+function genCode() { return String(Math.floor(100000 + Math.random() * 900000)); }
+
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { email, password, name, referral } = req.body;
@@ -382,15 +385,57 @@ app.post('/api/auth/register', async (req, res) => {
     const hashed = await bcrypt.hash(password, 10);
     const id = uuid();
     await queries.createUser(id, email, hashed, name.trim(), referral||null);
+
+    // Send verification code
+    const code = genCode();
+    const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    await queries.setVerifyCode(code, expires, id);
+    emails.verifyCode(email, name, code).catch(() => {});
+
     const user = await queries.getUserById(id);
     const plan = queries.getUserPlan(user);
     const token = jwt.sign({ id, email }, JWT_SECRET, { expiresIn:'30d' });
-    emails.welcome(email, name, 14).catch(()=>{});
     if (ADMIN_EMAIL) emails.adminNewUser(ADMIN_EMAIL, name, email).catch(()=>{});
-    res.json({ token, user: { ...user, password:undefined, plan_info:plan } });
+    res.json({ token, user: { ...user, password:undefined, plan_info:plan }, needsVerification: true });
   } catch(e) {
     logError('register', e);
     res.status(500).json({ error: 'Ошибка регистрации' });
+  }
+});
+
+app.post('/api/auth/verify', auth, async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ error: 'Введите код' });
+    const user = await queries.getUserById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'Не найден' });
+    if (user.email_verified) return res.json({ ok: true, already: true });
+    if (!user.verify_code || user.verify_code !== code.trim())
+      return res.status(400).json({ error: 'Неверный код' });
+    if (new Date(user.verify_expires) < new Date())
+      return res.status(400).json({ error: 'Код истёк. Запросите новый.' });
+    await queries.verifyEmail(user.id);
+    emails.welcome(user.email, user.name, 14).catch(() => {});
+    res.json({ ok: true });
+  } catch(e) {
+    logError('verify', e);
+    res.status(500).json({ error: 'Ошибка верификации' });
+  }
+});
+
+app.post('/api/auth/resend-code', auth, async (req, res) => {
+  try {
+    const user = await queries.getUserById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'Не найден' });
+    if (user.email_verified) return res.json({ ok: true, already: true });
+    const code = genCode();
+    const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    await queries.setVerifyCode(code, expires, user.id);
+    emails.verifyCode(user.email, user.name, code).catch(() => {});
+    res.json({ ok: true });
+  } catch(e) {
+    logError('resendCode', e);
+    res.status(500).json({ error: 'Ошибка отправки кода' });
   }
 });
 

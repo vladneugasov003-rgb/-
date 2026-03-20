@@ -51,6 +51,17 @@ async function initPg() {
       yukassa_id TEXT, created_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
+
+  // Migrations — add columns if they don't exist
+  const migrations = [
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS verify_code TEXT DEFAULT NULL`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS verify_expires TIMESTAMPTZ DEFAULT NULL`,
+  ];
+  for (const sql of migrations) {
+    try { await pgPool.query(sql); } catch(e) {}
+  }
+
   console.log('✅ PostgreSQL готов');
 }
 
@@ -176,6 +187,8 @@ const queries = {
   updateUserPlan: (plan,id) => run(`UPDATE users SET plan=$1 WHERE id=$2`,[plan,id]),
   updateProfile: (name,email,id) => run(`UPDATE users SET name=$1,email=$2 WHERE id=$3`,[name,email,id]),
   updatePassword: (hash,id) => run(`UPDATE users SET password=$1 WHERE id=$2`,[hash,id]),
+  setVerifyCode: (code,expires,id) => run(`UPDATE users SET verify_code=$1,verify_expires=$2 WHERE id=$3`,[code,expires,id]),
+  verifyEmail: (id) => run(`UPDATE users SET email_verified=TRUE,verify_code=NULL WHERE id=$1`,[id]),
 
   createBot: (id,uid,name,niche,desc,greeting) => run(
     `INSERT INTO bots (id,user_id,name,niche,description,greeting) VALUES ($1,$2,$3,$4,$5,$6)`,

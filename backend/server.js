@@ -15,6 +15,7 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'botmaster-dev-secret';
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
 const GEMINI_KEY = process.env.GEMINI_API_KEY || '';
+const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || '';
 const YUKASSA_SHOP = process.env.YUKASSA_SHOP_ID || '';
 const YUKASSA_KEY = process.env.YUKASSA_SECRET_KEY || '';
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
@@ -265,30 +266,77 @@ async function askGemini(bot, history, retries = 1) {
   }
 }
 
-// ── Smart router: Claude → Gemini → error ────────────────────────────────────
-async function askAI(bot, history) {
-  // If both keys exist, try Claude first, fall back to Gemini on ANY error
-  if (ANTHROPIC_KEY && GEMINI_KEY) {
+// ── OpenRouter API (free models, works from Russia) ──────────────────────────
+async function askOpenRouter(bot, history, retries = 1) {
+  const system = getSystemPrompt(bot);
+
+  // OpenRouter uses OpenAI-compatible format
+  const messages = [
+    { role: 'system', content: system },
+    ...history
+  ];
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      return await askClaude(bot, history);
-    } catch(e) {
-      console.log(`⚡ Claude error: ${e.message}, falling back to Gemini`);
-      try {
-        return await askGemini(bot, history);
-      } catch(e2) {
-        console.log(`❌ Gemini also failed: ${e2.message}`);
-        throw e2;
+      const resp = await fetchFn('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENROUTER_KEY}`,
+          'HTTP-Referer': BASE_URL,
+          'X-Title': 'BotMaster AI'
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.0-flash-exp:free',
+          max_tokens: 400,
+          messages
+        })
+      });
+
+      const data = await resp.json();
+
+      if (data.error) {
+        const msg = data.error.message || '';
+        if (msg.includes('rate') || msg.includes('limit')) {
+          if (attempt < retries) { await new Promise(r => setTimeout(r, 3000)); continue; }
+          throw new Error('AI_RATE_LIMITED');
+        }
+        if (msg.includes('credit') || msg.includes('key') || msg.includes('auth'))
+          throw new Error('AI_CREDITS_EXHAUSTED');
+        throw new Error(msg);
       }
+
+      const text = data.choices?.[0]?.message?.content;
+      if (!text) throw new Error('Пустой ответ от AI');
+      return text;
+    } catch(e) {
+      if (e.message.startsWith('AI_')) throw e;
+      if (attempt >= retries) throw e;
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+}
+
+// ── Smart router: Claude → Gemini → OpenRouter → error ───────────────────────
+async function askAI(bot, history) {
+  const providers = [];
+  if (ANTHROPIC_KEY) providers.push({ name: 'Claude', fn: askClaude });
+  if (GEMINI_KEY) providers.push({ name: 'Gemini', fn: askGemini });
+  if (OPENROUTER_KEY) providers.push({ name: 'OpenRouter', fn: askOpenRouter });
+
+  if (providers.length === 0) throw new Error('AI_NOT_CONFIGURED');
+
+  let lastError;
+  for (const { name, fn } of providers) {
+    try {
+      return await fn(bot, history);
+    } catch(e) {
+      console.log(`⚡ ${name} error: ${e.message}`);
+      lastError = e;
     }
   }
 
-  // Only Claude
-  if (ANTHROPIC_KEY) return await askClaude(bot, history);
-
-  // Only Gemini
-  if (GEMINI_KEY) return await askGemini(bot, history);
-
-  throw new Error('AI_NOT_CONFIGURED');
+  throw lastError;
 }
 
 // Convert AI errors to user-friendly messages
@@ -651,7 +699,7 @@ app.get('/api/vk/webhook/:botId', async (req, res) => {
 app.post('/api/vk/webhook/:botId', async (req, res) => {
   res.send('ok');
   const bot = await queries.getBotById(req.params.botId);
-  if (!bot || !bot.is_active || (!ANTHROPIC_KEY && !GEMINI_KEY) || !bot.vk_token) return;
+  if (!bot || !bot.is_active || (!ANTHROPIC_KEY && !GEMINI_KEY && !OPENROUTER_KEY) || !bot.vk_token) return;
   const msg = req.body?.object?.message;
   if (!msg?.text || msg.from_id < 0 || req.body.type === 'confirmation') return;
   const userId = msg.from_id;
@@ -675,7 +723,7 @@ app.post('/api/vk/webhook/:botId', async (req, res) => {
 // ── TELEGRAM ──────────────────────────────────────────────────────────────────
 app.post('/api/telegram/webhook/:token', async (req, res) => {
   res.json({ ok:true });
-  if (!ANTHROPIC_KEY && !GEMINI_KEY) return;
+  if (!ANTHROPIC_KEY && !GEMINI_KEY && !OPENROUTER_KEY) return;
   const token = req.params.token;
   const msg = req.body?.message || req.body?.edited_message;
   if (!msg?.text) return;
@@ -786,7 +834,7 @@ app.get('/api/admin/errors', adminAuth, (_, res) => {
 app.get('/api/health', (_, res) => res.json({
   status: 'ok',
   db: process.env.DATABASE_URL ? 'postgresql' : 'sqlite',
-  ai: ANTHROPIC_KEY ? 'claude' : GEMINI_KEY ? 'gemini' : 'missing',
+  ai: ANTHROPIC_KEY ? 'claude' : GEMINI_KEY ? 'gemini' : OPENROUTER_KEY ? 'openrouter' : 'missing',
   payments: YUKASSA_SHOP ? 'yukassa' : 'demo',
   uptime: Math.floor(process.uptime()) + 's',
 }));
@@ -857,7 +905,7 @@ init().then(() => {
   app.listen(PORT, () => {
     console.log(`\n✅ БотМастер v3.1 запущен: http://localhost:${PORT}`);
     console.log(`   DB: ${process.env.DATABASE_URL ? 'PostgreSQL ✓' : 'SQLite (локально)'}`);
-    console.log(`   AI: ${ANTHROPIC_KEY?'Claude ✓':''} ${GEMINI_KEY?'Gemini ✓':''} ${!ANTHROPIC_KEY&&!GEMINI_KEY?'✗ не настроен':''}`);
+    console.log(`   AI: ${ANTHROPIC_KEY?'Claude ✓':''} ${GEMINI_KEY?'Gemini ✓':''} ${OPENROUTER_KEY?'OpenRouter ✓':''} ${!ANTHROPIC_KEY&&!GEMINI_KEY&&!OPENROUTER_KEY?'✗ не настроен':''}`);
     console.log(`   Payments: ${YUKASSA_SHOP?'ЮКасса ✓':'демо-режим'}\n`);
   });
 

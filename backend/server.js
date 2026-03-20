@@ -107,9 +107,33 @@ const widgetChatLimiter = rateLimit({
   message: 'Подождите немного, слишком много сообщений'
 });
 
-// ── ERROR LOGGING ────────────────────────────────────────────────────────────
+// ── ERROR LOGGING + MONITORING ────────────────────────────────────────────────
 const errorLog = [];
 const MAX_ERROR_LOG = 500;
+const MONITOR_WEBHOOK = process.env.MONITOR_WEBHOOK || ''; // Telegram bot webhook or any URL
+const MONITOR_TG_BOT = process.env.MONITOR_TG_BOT || '';   // Telegram bot token for alerts
+const MONITOR_TG_CHAT = process.env.MONITOR_TG_CHAT || ''; // Telegram chat ID for alerts
+const errorThrottle = new Map(); // Prevent spam: same error max once per 5 min
+
+async function sendAlert(text) {
+  try {
+    // Telegram bot alerts
+    if (MONITOR_TG_BOT && MONITOR_TG_CHAT) {
+      await fetchFn(`https://api.telegram.org/bot${MONITOR_TG_BOT}/sendMessage`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: MONITOR_TG_CHAT, text, parse_mode: 'HTML' })
+      });
+      return;
+    }
+    // Generic webhook (Slack, Discord, etc.)
+    if (MONITOR_WEBHOOK) {
+      await fetchFn(MONITOR_WEBHOOK, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, content: text })
+      });
+    }
+  } catch(e) { /* silent */ }
+}
 
 function logError(context, error, extra = {}) {
   const entry = {
@@ -122,6 +146,25 @@ function logError(context, error, extra = {}) {
   console.error(`❌ [${context}]`, entry.message);
   errorLog.push(entry);
   if (errorLog.length > MAX_ERROR_LOG) errorLog.shift();
+
+  // Send alert for critical errors (throttled: 1 per context per 5 min)
+  const throttleKey = `${context}:${entry.message}`;
+  const now = Date.now();
+  if (!errorThrottle.has(throttleKey) || now - errorThrottle.get(throttleKey) > 300000) {
+    errorThrottle.set(throttleKey, now);
+    const isCritical = ['uncaughtException','unhandledRejection','paymentWebhook','trialCron'].includes(context)
+      || entry.message.includes('ECONNREFUSED') || entry.message.includes('database');
+    if (isCritical) {
+      sendAlert(`🚨 <b>БотМастер [${context}]</b>\n${entry.message}\n<i>${new Date().toLocaleString('ru')}</i>`);
+    }
+  }
+
+  // Cleanup old throttle entries every 10 min
+  if (errorThrottle.size > 200) {
+    for (const [k, t] of errorThrottle) {
+      if (now - t > 600000) errorThrottle.delete(k);
+    }
+  }
 }
 
 // ── WIDGET.JS ────────────────────────────────────────────────────────────────
@@ -166,27 +209,43 @@ const planMw = (f) => (req, res, next) => checkPlan(req, res, next, f);
 const fetchFn = (...a) => import('node-fetch').then(m => m.default(...a));
 
 function getSystemPrompt(bot) {
-  // Parse optional settings from knowledge field (format: ---settings--- at end)
   let knowledge = bot.knowledge || '';
+  let desc = bot.description || '';
   let tone = 'дружелюбный';
   let responseLen = 'коротко (2-4 предложения)';
-  let language = 'русский';
+  let language = 'на русском языке';
 
-  // Check if bot has custom settings in description (JSON at end after |||)
-  if (bot.description && bot.description.includes('|||')) {
-    const parts = bot.description.split('|||');
-    const desc = parts[0].trim();
+  // Parse settings from description (format: text|||{"tone":"friendly","length":"medium","language":"ru"})
+  if (desc.includes('|||')) {
+    const parts = desc.split('|||');
+    desc = parts[0].trim();
     try {
-      const settings = JSON.parse(parts[1]);
-      tone = settings.tone || tone;
-      responseLen = settings.length || responseLen;
-      language = settings.language || language;
+      const s = JSON.parse(parts[1]);
+      const toneMap = { friendly:'дружелюбно, с эмодзи, на «ты»', professional:'вежливо, на «вы», без эмодзи', casual:'неформально, расслабленно, молодёжно', formal:'официально, строго, на «вы», деловым языком' };
+      const lenMap = { short:'очень коротко (1-2 предложения)', medium:'коротко (2-4 предложения)', detailed:'подробно (4-6 предложений, с деталями)' };
+      const langMap = { ru:'на русском языке', en:'in English', auto:'на языке клиента (определи по его сообщению)' };
+      tone = toneMap[s.tone] || tone;
+      responseLen = lenMap[s.length] || responseLen;
+      language = langMap[s.language] || language;
     } catch(e) {}
-    // Use only the description part
-    return `Ты AI-ассистент бизнеса.\nНазвание: ${bot.name}\nНиша: ${bot.niche}\nОписание: ${desc}\nБаза знаний: ${knowledge||'не задана'}\nТон общения: ${tone}\nДлина ответов: ${responseLen}\nЯзык: ${language}`;
   }
 
-  return `Ты AI-ассистент бизнеса.\nНазвание: ${bot.name}\nНиша: ${bot.niche}\nОписание: ${bot.description}\nБаза знаний: ${knowledge||'не задана'}\nОтвечай ${responseLen}, ${tone}, на ${language} языке.`;
+  return `Ты AI-ассистент бизнеса. Твоя задача — помогать клиентам: отвечать на вопросы, рассказывать об услугах и ценах, записывать на приём.
+
+Бизнес: ${bot.name}
+Ниша: ${bot.niche}
+Описание: ${desc || 'не указано'}
+
+База знаний:
+${knowledge || 'Не задана — отвечай общими фразами и предлагай связаться с менеджером для деталей.'}
+
+Правила:
+- Отвечай ${responseLen}
+- Стиль: ${tone}
+- Язык: ${language}
+- Не придумывай цены и факты — используй только базу знаний
+- Если не знаешь ответ — предложи связаться с менеджером
+- Не говори что ты AI или нейросеть, если не спросят напрямую`;
 }
 
 // ── Claude API ───────────────────────────────────────────────────────────────
@@ -955,6 +1014,31 @@ async function checkTrialEnding() {
   }
 }
 
+// ── ADMIN BACKUP ─────────────────────────────────────────────────────────────
+app.get('/api/admin/backup', adminAuth, async (req, res) => {
+  if (!process.env.DATABASE_URL) return res.status(400).json({ error: 'Only PostgreSQL' });
+  try {
+    const { Pool } = require('pg');
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_URL?.includes('railway') ? { rejectUnauthorized: false } : false,
+    });
+    const tables = ['users', 'bots', 'conversations', 'messages', 'payments', 'analytics_events'];
+    const backup = { created_at: new Date().toISOString(), version: '3.6' };
+    for (const t of tables) {
+      const r = await pool.query(`SELECT * FROM ${t}`);
+      backup[t] = r.rows;
+    }
+    await pool.end();
+    if (backup.users) backup.users = backup.users.map(u => ({ ...u, password: '***' }));
+    res.setHeader('Content-Disposition', `attachment; filename=botmaster-backup-${new Date().toISOString().slice(0,10)}.json`);
+    res.json(backup);
+  } catch(e) {
+    logError('backupDownload', e);
+    res.status(500).json({ error: 'Ошибка создания бэкапа' });
+  }
+});
+
 // ── SERVE FRONTEND ───────────────────────────────────────────────────────────
 const publicDir = path.join(__dirname, 'public');
 if (fs.existsSync(publicDir)) {
@@ -977,13 +1061,66 @@ process.on('unhandledRejection', (e) => logError('unhandledRejection', e));
 // ── START ────────────────────────────────────────────────────────────────────
 init().then(() => {
   app.listen(PORT, () => {
-    console.log(`\n✅ БотМастер v3.1 запущен: http://localhost:${PORT}`);
+    console.log(`\n✅ БотМастер v3.6 запущен: http://localhost:${PORT}`);
     console.log(`   DB: ${process.env.DATABASE_URL ? 'PostgreSQL ✓' : 'SQLite (локально)'}`);
     console.log(`   AI: ${ANTHROPIC_KEY?'Claude ✓':''} ${GEMINI_KEY?'Gemini ✓':''} ${OPENROUTER_KEY?'OpenRouter ✓':''} ${!ANTHROPIC_KEY&&!GEMINI_KEY&&!OPENROUTER_KEY?'✗ не настроен':''}`);
-    console.log(`   Payments: ${YUKASSA_SHOP?'ЮКасса ✓':'демо-режим'}\n`);
+    console.log(`   Payments: ${YUKASSA_SHOP?'ЮКасса ✓':'демо-режим'}`);
+    console.log(`   Monitor: ${MONITOR_TG_BOT?'Telegram ✓':MONITOR_WEBHOOK?'Webhook ✓':'не настроен'}\n`);
   });
 
   // Run trial check every 6 hours
   checkTrialEnding();
   setInterval(checkTrialEnding, 6 * 60 * 60 * 1000);
+
+  // PostgreSQL backup every 12 hours (saves to /tmp and logs stats)
+  if (process.env.DATABASE_URL) {
+    runPgBackup();
+    setInterval(runPgBackup, 12 * 60 * 60 * 1000);
+  }
+
+  // Send startup alert
+  sendAlert(`✅ <b>БотМастер v3.6 запущен</b>\nDB: PostgreSQL\nAI: ${ANTHROPIC_KEY?'Claude ':''}${GEMINI_KEY?'Gemini ':''}${OPENROUTER_KEY?'OpenRouter':''}\n<i>${new Date().toLocaleString('ru')}</i>`);
+
 }).catch(e => { console.error('Ошибка запуска:', e); process.exit(1); });
+
+// ── POSTGRESQL BACKUP ────────────────────────────────────────────────────────
+async function runPgBackup() {
+  if (!process.env.DATABASE_URL) return;
+  try {
+    const { Pool } = require('pg');
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_URL?.includes('railway') ? { rejectUnauthorized: false } : false,
+    });
+
+    // Get table stats for monitoring
+    const tables = ['users', 'bots', 'conversations', 'messages', 'payments'];
+    const stats = {};
+    for (const t of tables) {
+      const r = await pool.query(`SELECT COUNT(*) as c FROM ${t}`);
+      stats[t] = parseInt(r.rows[0]?.c || 0);
+    }
+
+    // Create logical backup as JSON (portable, works on Railway)
+    const backup = {};
+    for (const t of tables) {
+      const r = await pool.query(`SELECT * FROM ${t}`);
+      backup[t] = r.rows;
+    }
+
+    // Save backup to /tmp (Railway ephemeral but survives restarts within deployment)
+    const backupStr = JSON.stringify(backup);
+    const backupPath = `/tmp/botmaster-backup-${new Date().toISOString().slice(0,10)}.json`;
+    require('fs').writeFileSync(backupPath, backupStr);
+
+    const sizeMb = (Buffer.byteLength(backupStr) / 1024 / 1024).toFixed(2);
+    console.log(`💾 Backup: ${sizeMb}MB | users:${stats.users} bots:${stats.bots} convs:${stats.conversations} msgs:${stats.messages}`);
+
+    // Send stats to monitoring
+    sendAlert(`💾 <b>Backup OK</b>\nusers: ${stats.users} | bots: ${stats.bots}\nconvs: ${stats.conversations} | msgs: ${stats.messages}\nsize: ${sizeMb}MB\n<i>${new Date().toLocaleString('ru')}</i>`);
+
+    await pool.end();
+  } catch(e) {
+    logError('pgBackup', e);
+  }
+}

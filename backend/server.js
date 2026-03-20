@@ -267,24 +267,26 @@ async function askGemini(bot, history, retries = 1) {
 
 // ── Smart router: Claude → Gemini → error ────────────────────────────────────
 async function askAI(bot, history) {
-  // Prefer Claude if key exists and has credits
-  if (ANTHROPIC_KEY) {
+  // If both keys exist, try Claude first, fall back to Gemini on ANY error
+  if (ANTHROPIC_KEY && GEMINI_KEY) {
     try {
       return await askClaude(bot, history);
     } catch(e) {
-      // If Claude fails with credits/auth, fall back to Gemini
-      if (GEMINI_KEY && (e.message === 'AI_CREDITS_EXHAUSTED' || e.message === 'AI_RATE_LIMITED')) {
-        console.log('⚡ Claude unavailable, falling back to Gemini');
+      console.log(`⚡ Claude error: ${e.message}, falling back to Gemini`);
+      try {
         return await askGemini(bot, history);
+      } catch(e2) {
+        console.log(`❌ Gemini also failed: ${e2.message}`);
+        throw e2;
       }
-      throw e;
     }
   }
 
-  // Gemini as primary
-  if (GEMINI_KEY) {
-    return await askGemini(bot, history);
-  }
+  // Only Claude
+  if (ANTHROPIC_KEY) return await askClaude(bot, history);
+
+  // Only Gemini
+  if (GEMINI_KEY) return await askGemini(bot, history);
 
   throw new Error('AI_NOT_CONFIGURED');
 }

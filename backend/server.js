@@ -166,7 +166,27 @@ const planMw = (f) => (req, res, next) => checkPlan(req, res, next, f);
 const fetchFn = (...a) => import('node-fetch').then(m => m.default(...a));
 
 function getSystemPrompt(bot) {
-  return `Ты AI-ассистент бизнеса.\nНазвание: ${bot.name}\nНиша: ${bot.niche}\nОписание: ${bot.description}\nБаза знаний: ${bot.knowledge||'не задана'}\nОтвечай коротко (2-4 предложения), дружелюбно, на русском.`;
+  // Parse optional settings from knowledge field (format: ---settings--- at end)
+  let knowledge = bot.knowledge || '';
+  let tone = 'дружелюбный';
+  let responseLen = 'коротко (2-4 предложения)';
+  let language = 'русский';
+
+  // Check if bot has custom settings in description (JSON at end after |||)
+  if (bot.description && bot.description.includes('|||')) {
+    const parts = bot.description.split('|||');
+    const desc = parts[0].trim();
+    try {
+      const settings = JSON.parse(parts[1]);
+      tone = settings.tone || tone;
+      responseLen = settings.length || responseLen;
+      language = settings.language || language;
+    } catch(e) {}
+    // Use only the description part
+    return `Ты AI-ассистент бизнеса.\nНазвание: ${bot.name}\nНиша: ${bot.niche}\nОписание: ${desc}\nБаза знаний: ${knowledge||'не задана'}\nТон общения: ${tone}\nДлина ответов: ${responseLen}\nЯзык: ${language}`;
+  }
+
+  return `Ты AI-ассистент бизнеса.\nНазвание: ${bot.name}\nНиша: ${bot.niche}\nОписание: ${bot.description}\nБаза знаний: ${knowledge||'не задана'}\nОтвечай ${responseLen}, ${tone}, на ${language} языке.`;
 }
 
 // ── Claude API ───────────────────────────────────────────────────────────────
@@ -831,6 +851,15 @@ app.get('/api/admin/errors', adminAuth, (_, res) => {
 });
 
 // ── HEALTH ────────────────────────────────────────────────────────────────────
+// ── PUBLIC FAQ ────────────────────────────────────────────────────────────────
+app.get('/api/faq', (_, res) => res.json([
+  { q: 'Нужен ли программист?', a: 'Нет. Конструктор визуальный — описываете бизнес текстом, выбираете каналы, нажимаете «Создать». 15–30 минут.' },
+  { q: 'Какие каналы поддерживаются?', a: 'Сайт (виджет), Telegram, ВКонтакте. WhatsApp в разработке.' },
+  { q: 'Что после окончания пробного периода?', a: 'Бесплатный тариф: 1 бот, 30 диалогов/мес. Данные сохраняются.' },
+  { q: 'Бот понимает русский?', a: 'Да, свободно общается на русском, понимает контекст.' },
+  { q: 'Безопасны ли данные?', a: 'PostgreSQL, шифрование, GDPR. Платежи через ЮКасса (PCI DSS).' },
+]));
+
 app.get('/api/health', (_, res) => res.json({
   status: 'ok',
   db: process.env.DATABASE_URL ? 'postgresql' : 'sqlite',

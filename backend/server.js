@@ -14,6 +14,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'botmaster-dev-secret';
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
+const GEMINI_KEY = process.env.GEMINI_API_KEY || '';
 const YUKASSA_SHOP = process.env.YUKASSA_SHOP_ID || '';
 const YUKASSA_KEY = process.env.YUKASSA_SECRET_KEY || '';
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
@@ -163,10 +164,13 @@ const planMw = (f) => (req, res, next) => checkPlan(req, res, next, f);
 // ── AI (with retry & friendly errors) ────────────────────────────────────────
 const fetchFn = (...a) => import('node-fetch').then(m => m.default(...a));
 
-async function askAI(bot, history, retries = 1) {
-  if (!ANTHROPIC_KEY) throw new Error('AI_NOT_CONFIGURED');
+function getSystemPrompt(bot) {
+  return `Ты AI-ассистент бизнеса.\nНазвание: ${bot.name}\nНиша: ${bot.niche}\nОписание: ${bot.description}\nБаза знаний: ${bot.knowledge||'не задана'}\nОтвечай коротко (2-4 предложения), дружелюбно, на русском.`;
+}
 
-  const system = `Ты AI-ассистент бизнеса.\nНазвание: ${bot.name}\nНиша: ${bot.niche}\nОписание: ${bot.description}\nБаза знаний: ${bot.knowledge||'не задана'}\nОтвечай коротко (2-4 предложения), дружелюбно, на русском.`;
+// ── Claude API ───────────────────────────────────────────────────────────────
+async function askClaude(bot, history, retries = 1) {
+  const system = getSystemPrompt(bot);
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -187,25 +191,17 @@ async function askAI(bot, history, retries = 1) {
 
       const data = await resp.json();
 
-      // Handle specific API errors
       if (data.error) {
         const errType = data.error.type || '';
         const errMsg = data.error.message || '';
-
         if (errType === 'authentication_error' || errMsg.includes('credit'))
           throw new Error('AI_CREDITS_EXHAUSTED');
         if (errType === 'rate_limit_error') {
-          if (attempt < retries) {
-            await new Promise(r => setTimeout(r, 2000));
-            continue;
-          }
+          if (attempt < retries) { await new Promise(r => setTimeout(r, 2000)); continue; }
           throw new Error('AI_RATE_LIMITED');
         }
         if (errType === 'overloaded_error') {
-          if (attempt < retries) {
-            await new Promise(r => setTimeout(r, 3000));
-            continue;
-          }
+          if (attempt < retries) { await new Promise(r => setTimeout(r, 3000)); continue; }
           throw new Error('AI_OVERLOADED');
         }
         throw new Error(errMsg);
@@ -218,6 +214,79 @@ async function askAI(bot, history, retries = 1) {
       await new Promise(r => setTimeout(r, 2000));
     }
   }
+}
+
+// ── Gemini API (free tier) ───────────────────────────────────────────────────
+async function askGemini(bot, history, retries = 1) {
+  const system = getSystemPrompt(bot);
+
+  // Convert {role: 'user'/'assistant', content} → Gemini format
+  const geminiHistory = history.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }]
+  }));
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const resp = await fetchFn(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: system }] },
+            contents: geminiHistory,
+            generationConfig: { maxOutputTokens: 400, temperature: 0.7 }
+          })
+        }
+      );
+
+      const data = await resp.json();
+
+      if (data.error) {
+        const code = data.error.code || 0;
+        const msg = data.error.message || '';
+        if (code === 429) {
+          if (attempt < retries) { await new Promise(r => setTimeout(r, 3000)); continue; }
+          throw new Error('AI_RATE_LIMITED');
+        }
+        if (code === 403 || msg.includes('API key')) throw new Error('AI_CREDITS_EXHAUSTED');
+        throw new Error(msg);
+      }
+
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error('Пустой ответ от AI');
+      return text;
+    } catch(e) {
+      if (e.message.startsWith('AI_')) throw e;
+      if (attempt >= retries) throw e;
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+}
+
+// ── Smart router: Claude → Gemini → error ────────────────────────────────────
+async function askAI(bot, history) {
+  // Prefer Claude if key exists and has credits
+  if (ANTHROPIC_KEY) {
+    try {
+      return await askClaude(bot, history);
+    } catch(e) {
+      // If Claude fails with credits/auth, fall back to Gemini
+      if (GEMINI_KEY && (e.message === 'AI_CREDITS_EXHAUSTED' || e.message === 'AI_RATE_LIMITED')) {
+        console.log('⚡ Claude unavailable, falling back to Gemini');
+        return await askGemini(bot, history);
+      }
+      throw e;
+    }
+  }
+
+  // Gemini as primary
+  if (GEMINI_KEY) {
+    return await askGemini(bot, history);
+  }
+
+  throw new Error('AI_NOT_CONFIGURED');
 }
 
 // Convert AI errors to user-friendly messages
@@ -580,7 +649,7 @@ app.get('/api/vk/webhook/:botId', async (req, res) => {
 app.post('/api/vk/webhook/:botId', async (req, res) => {
   res.send('ok');
   const bot = await queries.getBotById(req.params.botId);
-  if (!bot || !bot.is_active || !ANTHROPIC_KEY || !bot.vk_token) return;
+  if (!bot || !bot.is_active || (!ANTHROPIC_KEY && !GEMINI_KEY) || !bot.vk_token) return;
   const msg = req.body?.object?.message;
   if (!msg?.text || msg.from_id < 0 || req.body.type === 'confirmation') return;
   const userId = msg.from_id;
@@ -604,7 +673,7 @@ app.post('/api/vk/webhook/:botId', async (req, res) => {
 // ── TELEGRAM ──────────────────────────────────────────────────────────────────
 app.post('/api/telegram/webhook/:token', async (req, res) => {
   res.json({ ok:true });
-  if (!ANTHROPIC_KEY) return;
+  if (!ANTHROPIC_KEY && !GEMINI_KEY) return;
   const token = req.params.token;
   const msg = req.body?.message || req.body?.edited_message;
   if (!msg?.text) return;
@@ -715,7 +784,7 @@ app.get('/api/admin/errors', adminAuth, (_, res) => {
 app.get('/api/health', (_, res) => res.json({
   status: 'ok',
   db: process.env.DATABASE_URL ? 'postgresql' : 'sqlite',
-  ai: ANTHROPIC_KEY ? 'configured' : 'missing',
+  ai: ANTHROPIC_KEY ? 'claude' : GEMINI_KEY ? 'gemini' : 'missing',
   payments: YUKASSA_SHOP ? 'yukassa' : 'demo',
   uptime: Math.floor(process.uptime()) + 's',
 }));
@@ -786,7 +855,7 @@ init().then(() => {
   app.listen(PORT, () => {
     console.log(`\n✅ БотМастер v3.1 запущен: http://localhost:${PORT}`);
     console.log(`   DB: ${process.env.DATABASE_URL ? 'PostgreSQL ✓' : 'SQLite (локально)'}`);
-    console.log(`   AI: ${ANTHROPIC_KEY?'✓':'✗'}`);
+    console.log(`   AI: ${ANTHROPIC_KEY?'Claude ✓':''} ${GEMINI_KEY?'Gemini ✓':''} ${!ANTHROPIC_KEY&&!GEMINI_KEY?'✗ не настроен':''}`);
     console.log(`   Payments: ${YUKASSA_SHOP?'ЮКасса ✓':'демо-режим'}\n`);
   });
 

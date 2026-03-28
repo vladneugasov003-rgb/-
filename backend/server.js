@@ -746,7 +746,18 @@ app.post('/api/widget/:botId/transfer', async (req, res) => {
     const { conversation_id, client_name, client_contact } = req.body;
     if (conversation_id) await queries.updateConvStatus(conversation_id, 'transferred');
     const owner = await queries.getUserById(bot.user_id);
-    if (owner?.email) emails.transferAlert(owner.email, owner.name, bot.name, client_name, client_contact, conversation_id).catch(()=>{});
+
+    let emailSent = false;
+    if (owner?.email) {
+      emailSent = await emails.transferAlert(owner.email, owner.name, bot.name, client_name, client_contact, conversation_id).catch(() => false);
+    }
+
+    if (!emailSent && MONITOR_TG_BOT && MONITOR_TG_CHAT) {
+      sendAlert(`🙋 <b>Запрос на менеджера (виджет)</b>\nБот: ${bot.name}\nКлиент: ${client_name || '—'}\nКонтакт: ${client_contact || '—'}\nВладелец: ${owner?.email || '—'}`);
+    }
+
+    console.log(`🙋 Widget transfer: bot=${bot.name}, client=${client_name}/${client_contact}, email=${emailSent?'sent':'skipped'}`);
+
     if (bot.amocrm_domain && bot.amocrm_token) createLeadFromChat(bot, client_name, client_contact, 'Запрос на связь с менеджером').catch(()=>{});
     res.json({ ok:true });
   } catch(e) {
@@ -787,7 +798,21 @@ app.post('/api/bots/:id/transfer', auth, async (req, res) => {
     const { conversation_id, client_name, client_contact } = req.body;
     if (conversation_id) await queries.updateConvStatus(conversation_id, 'transferred');
     const owner = await queries.getUserById(bot.user_id);
-    if (owner?.email) emails.transferAlert(owner.email, owner.name, bot.name, client_name, client_contact, conversation_id).catch(()=>{});
+
+    // Try email notification
+    let emailSent = false;
+    if (owner?.email) {
+      emailSent = await emails.transferAlert(owner.email, owner.name, bot.name, client_name, client_contact, conversation_id).catch(() => false);
+    }
+
+    // Telegram fallback notification
+    if (!emailSent && MONITOR_TG_BOT && MONITOR_TG_CHAT) {
+      sendAlert(`🙋 <b>Запрос на менеджера</b>\nБот: ${bot.name}\nКлиент: ${client_name || '—'}\nКонтакт: ${client_contact || '—'}\nВладелец: ${owner?.email || '—'}`);
+    }
+
+    // Log for debugging
+    console.log(`🙋 Transfer: bot=${bot.name}, client=${client_name}/${client_contact}, email=${emailSent?'sent':'skipped'}`);
+
     if (bot.amocrm_domain && bot.amocrm_token) createLeadFromChat(bot, client_name, client_contact, 'Запрос на связь с менеджером').catch(()=>{});
     res.json({ ok:true });
   } catch(e) {

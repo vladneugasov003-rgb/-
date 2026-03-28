@@ -8,7 +8,7 @@
 
   const BOT_ID = script.getAttribute('data-bot');
   const COLOR = script.getAttribute('data-color') || '#7c6cf5';
-  const API = script.getAttribute('data-api') || 'https://fearless-possibility-production-d961.up.railway.app';
+  const API = script.getAttribute('data-api') || 'https://www.botmasterai.ru';
 
   if (!BOT_ID) return;
 
@@ -102,7 +102,7 @@
           <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
         </button>
       </div>
-      <div id="bm-powered">Работает на <a href="https://botmaster.ru" target="_blank">БотМастере</a></div>
+      <div id="bm-powered">Работает на <a href="https://www.botmasterai.ru" target="_blank">БотМастере</a></div>
     </div>
   `;
   document.body.appendChild(widget);

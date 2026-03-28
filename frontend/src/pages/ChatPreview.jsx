@@ -34,7 +34,7 @@ export default function ChatPreview() {
       await fetch(`/api/bots/${id}/transfer`, {
         method: 'POST',
         headers: { 'Content-Type':'application/json', Authorization:`Bearer ${token}` },
-        body: JSON.stringify({ conversation_id: convId, ...transferForm })
+        body: JSON.stringify({ conversation_id: convId, client_name: transferForm.name, client_contact: transferForm.contact })
       })
       setTransferred(true)
       setShowTransfer(false)
